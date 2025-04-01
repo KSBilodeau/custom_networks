@@ -8,7 +8,7 @@ use rustix::net::{bind, sendto, socket, AddressFamily, SendFlags, SocketType};
 use std::net::SocketAddr;
 
 #[derive(Debug)]
-pub struct CustomTcpHeader {
+struct CustomTcpHeader {
     src_port: u16,
     dst_port: u16,
     seq_no: u32,
@@ -97,7 +97,7 @@ impl TryFrom<&[u8]> for CustomTcpHeader {
 }
 
 #[derive(Debug)]
-pub struct CustomTcpPayload {
+struct CustomTcpPayload {
     header: CustomTcpHeader,
     data: [u8; CustomTcpPayload::MAX_SEGMENT_SIZE],
 }
