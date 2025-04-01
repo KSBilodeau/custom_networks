@@ -7,7 +7,6 @@ use rustix::io::read;
 use rustix::net::{bind, sendto, socket, AddressFamily, SendFlags, SocketType};
 use std::net::SocketAddr;
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct CustomTcpHeader {
     src_port: u16,
@@ -97,7 +96,6 @@ impl TryFrom<&[u8]> for CustomTcpHeader {
     }
 }
 
-#[allow(dead_code)]
 #[derive(Debug)]
 pub struct CustomTcpPayload {
     header: CustomTcpHeader,
