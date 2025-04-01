@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 anyhow = "1.0.97"
+etherparse = "0.17.0"
 rustix = { version = "1.0.3", features = ["net"] }
