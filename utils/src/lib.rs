@@ -1,9 +1,9 @@
 #![deny(clippy::pedantic)]
 
+use std::net::SocketAddr;
 use anyhow::{Context, Result};
 use rustix::fd::OwnedFd;
-use rustix::net::{acceptfrom, socket, AddressFamily, SocketType};
-use std::net::SocketAddr;
+use rustix::net::{bind, socket, AddressFamily, SocketType};
 
 #[allow(dead_code)]
 pub struct CustomTcpHeader {
@@ -66,31 +66,11 @@ pub enum ConnectionType {
     Client,
 }
 
-pub fn init_client(ip_addr: &str, port: &str) -> Result<OwnedFd> {
+pub fn bind_raw(ip_addr: &str) -> Result<OwnedFd> {
     let socket_file_desc = create_socket()?;
-
-    let sock_addr: SocketAddr = format!("{}:{}", ip_addr, port)
-        .parse()
-        .with_context(|| "Failed to parse IP address")?;
-
-    rustix::net::connect(&socket_file_desc, &sock_addr)
-        .with_context(|| format!("Failed to connect to socket at {}:{}", ip_addr, port))?;
-
-    Ok(socket_file_desc)
-}
-
-pub fn init_server(ip_addr: &str, port: &str, backlog: i32) -> Result<OwnedFd> {
-    let socket_file_desc = create_socket()?;
-
-    let sock_addr: SocketAddr = format!("{}:{}", ip_addr, port)
-        .parse()
-        .with_context(|| "Failed to parse IP address")?;
-
-    rustix::net::bind(&socket_file_desc, &sock_addr)
-        .with_context(|| format!("Failed to bind socket to {}:{}", ip_addr, port))?;
-
-    rustix::net::listen(&socket_file_desc, backlog)
-        .with_context(|| "Failed to enable listening")?;
+    let sock_addr: SocketAddr = format!("{}:0000", ip_addr).parse()?;
+    
+    bind(&socket_file_desc, &sock_addr)?;
 
     Ok(socket_file_desc)
 }
@@ -107,8 +87,8 @@ pub fn handshake(fd: &OwnedFd, conn_type: ConnectionType) -> Result<()> {
 fn create_socket() -> Result<OwnedFd> {
     socket(
         AddressFamily::INET,
-        SocketType::DGRAM,
-        Some(rustix::net::ipproto::UDP),
+        SocketType::RAW,
+        Some(rustix::net::ipproto::RAW),
     )
     .with_context(|| "Failed to create socket")
 }
