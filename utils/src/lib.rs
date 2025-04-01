@@ -188,7 +188,13 @@ pub fn bind_raw(ip_addr: &str) -> Result<OwnedFd> {
     Ok(socket_file_desc)
 }
 
-pub fn handshake(fd: &OwnedFd, ip_addr: &str, src_port: &str, dst_port: Option<&str>, conn_type: ConnectionType) -> Result<()> {
+pub fn handshake(
+    fd: &OwnedFd,
+    ip_addr: &str,
+    src_port: &str,
+    dst_port: Option<&str>,
+    conn_type: ConnectionType,
+) -> Result<()> {
     match conn_type {
         ConnectionType::Server => server_handshake(fd, ip_addr, src_port)?,
         ConnectionType::Client => client_handshake(fd, ip_addr, src_port, dst_port)?,
@@ -203,7 +209,7 @@ fn create_socket() -> Result<OwnedFd> {
         SocketType::RAW,
         Some(rustix::net::ipproto::RAW),
     )
-        .with_context(|| "Failed to create socket")
+    .with_context(|| "Failed to create socket")
 }
 
 fn server_handshake(fd: &OwnedFd, ip_addr: &str, src_port: &str) -> Result<()> {
@@ -220,7 +226,11 @@ fn server_handshake(fd: &OwnedFd, ip_addr: &str, src_port: &str) -> Result<()> {
     let dst_port = syn_payload.header.src_port;
 
     if syn_payload.header.syn_flag {
-        send(fd, CustomTcpPayload::syn_ack(src_port, dst_port), &sock_addr)?;
+        send(
+            fd,
+            CustomTcpPayload::syn_ack(src_port, dst_port),
+            &sock_addr,
+        )?;
 
         let ack_payload = recv(fd, Some(src_port))?;
 
@@ -234,7 +244,12 @@ fn server_handshake(fd: &OwnedFd, ip_addr: &str, src_port: &str) -> Result<()> {
     Ok(())
 }
 
-fn client_handshake(fd: &OwnedFd, ip_addr: &str, src_port: &str, dst_port: Option<&str>) -> Result<()> {
+fn client_handshake(
+    fd: &OwnedFd,
+    ip_addr: &str,
+    src_port: &str,
+    dst_port: Option<&str>,
+) -> Result<()> {
     let sock_addr: SocketAddr = format!("{}:0000", ip_addr)
         .parse()
         .with_context(|| "Failed to convert ip address from string")?;
@@ -263,12 +278,7 @@ fn client_handshake(fd: &OwnedFd, ip_addr: &str, src_port: &str, dst_port: Optio
 fn send(fd: &OwnedFd, payload: CustomTcpPayload, sock_addr: &SocketAddr) -> Result<()> {
     println!("send: {:?}", payload.header);
 
-    sendto(
-        &fd,
-        &payload.into_vec(),
-        SendFlags::empty(),
-        sock_addr,
-    )
+    sendto(&fd, &payload.into_vec(), SendFlags::empty(), sock_addr)
         .with_context(|| "Failed to write to socket")?;
 
     Ok(())

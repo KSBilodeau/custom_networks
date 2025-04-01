@@ -9,7 +9,6 @@ fn main() -> Result<()> {
         std::env::var("SRC_PORT").with_context(|| "Missing port environment variable")?;
 
     let socket_file_desc = utils::bind_raw(&ip_addr)?;
-    
 
     loop {
         utils::handshake(
