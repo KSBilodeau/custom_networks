@@ -8,6 +8,12 @@ use rustix::net::{bind, sendto, socket, AddressFamily, SendFlags, SocketType};
 use std::net::SocketAddr;
 
 #[derive(Debug)]
+pub enum ConnectionType {
+    Server,
+    Client,
+}
+
+#[derive(Debug)]
 struct CustomTcpHeader {
     src_port: u16,
     dst_port: u16,
@@ -169,11 +175,6 @@ impl TryFrom<&[u8]> for CustomTcpPayload {
                 .with_context(|| "Failed to convert payload bytes into slice")?,
         })
     }
-}
-
-pub enum ConnectionType {
-    Server,
-    Client,
 }
 
 pub fn bind_raw(ip_addr: &str) -> Result<OwnedFd> {
