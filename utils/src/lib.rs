@@ -2,7 +2,7 @@
 
 use anyhow::{Context, Result};
 use rustix::fd::OwnedFd;
-use rustix::net::{socket, AddressFamily, SocketType};
+use rustix::net::{acceptfrom, socket, AddressFamily, SocketType};
 use std::net::SocketAddr;
 
 #[allow(dead_code)]
@@ -97,8 +97,8 @@ pub fn init_server(ip_addr: &str, port: &str, backlog: i32) -> Result<OwnedFd> {
 
 pub fn handshake(fd: &OwnedFd, conn_type: ConnectionType) -> Result<()> {
     match conn_type {
-        ConnectionType::Server => server_handshake(fd, conn_type)?,
-        ConnectionType::Client => client_handshake(fd, conn_type)?,
+        ConnectionType::Server => server_handshake(fd)?,
+        ConnectionType::Client => client_handshake(fd)?,
     };
 
     Ok(())
@@ -113,10 +113,10 @@ fn create_socket() -> Result<OwnedFd> {
     .with_context(|| "Failed to create socket")
 }
 
-fn server_handshake(_fd: &OwnedFd, _conn_type: ConnectionType) -> Result<()> {
+fn server_handshake(_fd: &OwnedFd) -> Result<()> {
     Ok(())
 }
 
-fn client_handshake(_fd: &OwnedFd, _conn_type: ConnectionType) -> Result<()> {
+fn client_handshake(_fd: &OwnedFd) -> Result<()> {
     Ok(())
 }
