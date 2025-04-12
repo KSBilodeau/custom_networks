@@ -1,9 +1,11 @@
 #![deny(clippy::pedantic)]
 
+mod client;
+mod server;
 mod tcp;
 
-use crate::tcp::{CustomTcpFlags, CustomTcpPayload};
-use anyhow::{bail, Context, Result};
+use crate::tcp::CustomTcpPayload;
+use anyhow::{Context, Result};
 use etherparse::IpNumber;
 use rustix::fd::OwnedFd;
 use rustix::io::read;
@@ -44,84 +46,9 @@ pub fn handshake(
     conn_type: ConnectionType,
 ) -> Result<()> {
     match conn_type {
-        ConnectionType::Server => server_handshake(fd, ip_addr, src_port)?,
-        ConnectionType::Client => client_handshake(fd, ip_addr, src_port, dst_port)?,
+        ConnectionType::Server => server::server_handshake(fd, ip_addr, src_port)?,
+        ConnectionType::Client => client::client_handshake(fd, ip_addr, src_port, dst_port)?,
     };
-
-    Ok(())
-}
-
-fn server_handshake(fd: &OwnedFd, ip_addr: &str, src_port: &str) -> Result<()> {
-    let sock_addr: SocketAddr = format!("{}:0000", ip_addr)
-        .parse()
-        .with_context(|| "Failed to convert ip address from string")?;
-
-    let src_port = src_port
-        .parse()
-        .with_context(|| "Failed to convert port to u16")?;
-
-    let syn_payload = recv(fd, None)?;
-
-    let dst_port = syn_payload.src_port();
-
-    if syn_payload.has_syn() {
-        send(
-            fd,
-            CustomTcpPayload::new(
-                src_port,
-                dst_port,
-                vec![CustomTcpFlags::Syn, CustomTcpFlags::Ack],
-            ),
-            &sock_addr,
-        )?;
-
-        let ack_payload = recv(fd, Some(src_port))?;
-
-        if !ack_payload.has_ack() {
-            bail!("Handshake missing final ack flag");
-        }
-    } else {
-        bail!("Handshake missing initial syn flag");
-    }
-
-    Ok(())
-}
-
-fn client_handshake(
-    fd: &OwnedFd,
-    ip_addr: &str,
-    src_port: &str,
-    dst_port: Option<&str>,
-) -> Result<()> {
-    let sock_addr: SocketAddr = format!("{}:0000", ip_addr)
-        .parse()
-        .with_context(|| "Failed to convert ip address from string")?;
-
-    let src_port = src_port
-        .parse()
-        .with_context(|| "Failed to convert port to u16")?;
-    let dst_port = dst_port
-        .with_context(|| "Missing server port")?
-        .parse()
-        .with_context(|| "Failed to convert port to u16")?;
-
-    send(
-        fd,
-        CustomTcpPayload::new(src_port, dst_port, vec![CustomTcpFlags::Syn]),
-        &sock_addr,
-    )?;
-
-    let syn_ack_payload = recv(fd, Some(src_port))?;
-
-    if syn_ack_payload.has_syn() && syn_ack_payload.has_ack() {
-        send(
-            fd,
-            CustomTcpPayload::new(src_port, dst_port, vec![CustomTcpFlags::Ack]),
-            &sock_addr,
-        )?;
-    } else {
-        bail!("Handshake missing syn-ack flags");
-    }
 
     Ok(())
 }
