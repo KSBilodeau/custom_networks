@@ -4,15 +4,15 @@ use anyhow::{Context, Result};
 
 fn main() -> Result<()> {
     let src_ip_addr =
-        std::env::var("SRC_IP_ADDR").with_context(|| "Missing IP addr environment variable")?;
+        std::env::var("SRC_IP_ADDR").with_context(|| "Missing SRC IP addr environment variable")?;
     let dst_ip_addr =
-        std::env::var("DST_IP_ADDR").with_context(|| "Missing IP addr environment variable")?;
+        std::env::var("DST_IP_ADDR").with_context(|| "Missing DEST IP addr environment variable")?;
     let src_port =
         std::env::var("SRC_PORT").with_context(|| "Missing port environment variable")?;
     let dst_port =
         std::env::var("DST_PORT").with_context(|| "Missing port environment variable")?;
 
-    let socket_file_desc = utils::bind_raw(&dst_ip_addr)?;
+    let socket_file_desc = utils::bind_raw(&src_ip_addr)?;
 
     let conn = utils::client::connect(
         &socket_file_desc,

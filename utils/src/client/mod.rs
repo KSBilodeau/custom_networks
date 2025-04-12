@@ -13,7 +13,7 @@ pub fn connect<'a>(
     dst_port: &str,
 ) -> anyhow::Result<Connection<'a>> {
     // Create server socket address
-    let server_addr: SocketAddr = format!("{}:0000", dst_ip_addr)
+    let server_addr: SocketAddr = format!("{}:{}", dst_ip_addr, dst_port)
         .parse()
         .with_context(|| "Failed to convert ip address from string")?;
 
