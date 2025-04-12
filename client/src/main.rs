@@ -14,13 +14,7 @@ fn main() -> Result<()> {
 
     let socket_file_desc = utils::bind_raw(&src_ip_addr, &src_port)?;
 
-    let conn = utils::client::connect(
-        &socket_file_desc,
-        &src_ip_addr,
-        &src_port,
-        &dst_ip_addr,
-        &dst_port,
-    )?;
+    let conn = utils::client::connect(&socket_file_desc, &src_port, &dst_ip_addr, &dst_port)?;
 
     println!("Connect completed successfully!");
 

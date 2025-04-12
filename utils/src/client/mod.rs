@@ -7,7 +7,6 @@ use std::os::fd::{AsRawFd, OwnedFd};
 
 pub fn connect<'a>(
     socket: &'a OwnedFd,
-    src_ip_addr: &str,
     src_port: &str,
     dst_ip_addr: &str,
     dst_port: &str,
@@ -30,7 +29,7 @@ pub fn connect<'a>(
     // Initiate connection with the server by broadcasting address to it
     sendto(
         &socket,
-        &format!("{}::{}:{}", dst_port, src_ip_addr, src_port).into_bytes(),
+        &format!("{}::{}", dst_port, src_port).into_bytes(),
         rustix::net::SendFlags::empty(),
         &server_addr,
     )?;
@@ -45,7 +44,7 @@ pub fn connect<'a>(
             .with_context(|| "Failed to construct header from buffer")?;
 
         if ip_header.protocol == etherparse::IpNumber::IPV4
-            && buf == format!("{}::{}:{}", &src_port, &dst_ip_addr, &dst_port).as_bytes()
+            && buf == format!("{}::{}", &src_port, &dst_port).as_bytes()
         {
             break;
         }
