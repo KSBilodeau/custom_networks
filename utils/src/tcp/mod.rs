@@ -147,22 +147,11 @@ impl CustomTcpPayload {
     // }
 
     pub(crate) fn into_vec(self) -> Vec<u8> {
-        Vec::<u8>::from(self)
+        Vec::<u8>::from(&self)
     }
 
     const fn size() -> usize {
         CustomTcpHeader::size() + size_of::<u8>() * Self::MAX_SEGMENT_SIZE
-    }
-}
-
-impl From<CustomTcpPayload> for Vec<u8> {
-    fn from(payload: CustomTcpPayload) -> Self {
-        let mut result = Vec::with_capacity(CustomTcpPayload::size());
-
-        result.extend_from_slice(&Vec::<u8>::from(&payload.header));
-        result.extend_from_slice(&payload.data);
-
-        result
     }
 }
 
