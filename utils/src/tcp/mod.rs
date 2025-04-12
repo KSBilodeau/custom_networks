@@ -25,7 +25,7 @@ impl CustomTcpHeader {
             dst_port,
             seq_no: 0,
             ack_flag: false,
-            syn_flag: true,
+            syn_flag: false,
             fin_flag: false,
             payload_size: 0,
         };

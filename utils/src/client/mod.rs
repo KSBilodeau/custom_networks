@@ -1,44 +1,54 @@
+use crate::Connection;
+use anyhow::Context;
+use rustix::io::read;
+use rustix::net::sendto;
 use std::net::SocketAddr;
 use std::os::fd::OwnedFd;
-use anyhow::{bail, Context};
-use crate::{recv, send};
-use crate::tcp::{CustomTcpFlags, CustomTcpPayload};
 
-pub(crate) fn client_handshake(
-    fd: &OwnedFd,
-    ip_addr: &str,
+pub fn connect<'a>(
+    socket: &'a OwnedFd,
+    src_ip_addr: &str,
     src_port: &str,
-    dst_port: Option<&str>,
-) -> anyhow::Result<()> {
-    let sock_addr: SocketAddr = format!("{}:0000", ip_addr)
+    dst_ip_addr: &str,
+    dst_port: &str,
+) -> anyhow::Result<Connection<'a>> {
+    // Create server socket address
+    let server_addr: SocketAddr = format!("{}:0000", dst_ip_addr)
         .parse()
         .with_context(|| "Failed to convert ip address from string")?;
 
-    let src_port = src_port
-        .parse()
-        .with_context(|| "Failed to convert port to u16")?;
-    let dst_port = dst_port
-        .with_context(|| "Missing server port")?
-        .parse()
-        .with_context(|| "Failed to convert port to u16")?;
-
-    send(
-        fd,
-        CustomTcpPayload::new(src_port, dst_port, vec![CustomTcpFlags::Syn]),
-        &sock_addr,
+    // Initiate connection with the server by broadcasting address to it
+    sendto(
+        &socket,
+        &format!("{}::{}:{}", dst_port, src_ip_addr, src_port).into_bytes(),
+        rustix::net::SendFlags::empty(),
+        &server_addr,
     )?;
 
-    let syn_ack_payload = recv(fd, Some(src_port))?;
+    // Wait for server accept message
+    let mut buf = [0u8; 65535];
+    loop {
+        let bytes_read =
+            read(socket, &mut buf).with_context(|| "Failed to read bytes from socket")?;
 
-    if syn_ack_payload.has_syn() && syn_ack_payload.has_ack() {
-        send(
-            fd,
-            CustomTcpPayload::new(src_port, dst_port, vec![CustomTcpFlags::Ack]),
-            &sock_addr,
-        )?;
-    } else {
-        bail!("Handshake missing syn-ack flags");
+        let (ip_header, buf) = etherparse::Ipv4Header::from_slice(&buf[0..bytes_read])
+            .with_context(|| "Failed to construct header from buffer")?;
+
+        if ip_header.protocol == etherparse::IpNumber::from(255)
+            && buf == format!("{}::{}:{}", &src_port, &dst_ip_addr, &dst_port).as_bytes()
+        {
+            break;
+        }
     }
 
-    Ok(())
+    Ok(Connection {
+        src_socket: &socket,
+        src_port: src_port
+            .parse()
+            .with_context(|| "Failed to convert port to u16")?,
+        dst_socket: server_addr,
+        dst_port: dst_port
+            .parse()
+            .with_context(|| "Failed to convert port to u16")?,
+    })
 }

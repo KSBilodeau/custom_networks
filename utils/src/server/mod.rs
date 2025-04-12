@@ -1,41 +1,57 @@
+use crate::Connection;
+use anyhow::Context;
+use rustix::io::read;
+use rustix::net::sendto;
 use std::net::SocketAddr;
 use std::os::fd::OwnedFd;
-use anyhow::{bail, Context};
-use crate::{recv, send};
-use crate::tcp::{CustomTcpFlags, CustomTcpPayload};
 
-pub(crate) fn server_handshake(fd: &OwnedFd, ip_addr: &str, src_port: &str) -> anyhow::Result<()> {
-    let sock_addr: SocketAddr = format!("{}:0000", ip_addr)
-        .parse()
-        .with_context(|| "Failed to convert ip address from string")?;
+pub fn accept<'a>(
+    socket: &'a OwnedFd,
+    src_ip_addr: &str,
+    src_port: &str,
+) -> anyhow::Result<Connection<'a>> {
+    // Look for incoming IP address broadcasts from potential clients
+    let mut broadcast_buf = [0u8; 65535];
+    loop {
+        let bytes_read = read(socket, &mut broadcast_buf)
+            .with_context(|| "Failed to read broadcast bytes to buffer")?;
+        let broadcast = &broadcast_buf[0..bytes_read];
 
-    let src_port = src_port
-        .parse()
-        .with_context(|| "Failed to convert port to u16")?;
+        let (_, broadcast) = etherparse::Ipv4Header::from_slice(broadcast)
+            .with_context(|| "Failed to construct header from buffer")?;
 
-    let syn_payload = recv(fd, None)?;
+        let broadcast_str = String::from_utf8_lossy(&broadcast);
 
-    let dst_port = syn_payload.src_port();
+        let (port, client_addr) = broadcast_str
+            .split_once("::")
+            .with_context(|| "Failed to extract ip addr from port")?;
 
-    if syn_payload.has_syn() {
-        send(
-            fd,
-            CustomTcpPayload::new(
-                src_port,
-                dst_port,
-                vec![CustomTcpFlags::Syn, CustomTcpFlags::Ack],
-            ),
-            &sock_addr,
-        )?;
+        let (client_addr, client_port) = client_addr
+            .split_once(":")
+            .with_context(|| "Failed to extract client addr from port")?;
 
-        let ack_payload = recv(fd, Some(src_port))?;
+        if src_port == port {
+            let client_addr: SocketAddr = format!("{}:0000", client_addr)
+                .parse()
+                .with_context(|| "Failed to convert ip address from string")?;
 
-        if !ack_payload.has_ack() {
-            bail!("Handshake missing final ack flag");
+            sendto(
+                &socket,
+                format!("{}::{}:{}", &client_port, &src_ip_addr, &src_port).as_bytes(),
+                rustix::net::SendFlags::empty(),
+                &client_addr,
+            )?;
+
+            return Ok(Connection {
+                src_socket: socket,
+                src_port: src_port
+                    .parse()
+                    .with_context(|| "Failed to convert port to u16")?,
+                dst_socket: client_addr,
+                dst_port: client_port
+                    .parse()
+                    .with_context(|| "Failed to convert port to u16")?,
+            });
         }
-    } else {
-        bail!("Handshake missing initial syn flag");
     }
-
-    Ok(())
 }
