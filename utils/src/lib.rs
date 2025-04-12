@@ -100,7 +100,7 @@ impl Connection<'_> {
                 .with_context(|| "Failed to extract IpV4 header")?;
 
             // Check if it came from a raw socket first
-            if ip_header.protocol == etherparse::IpNumber::from(255) {
+            if ip_header.protocol == etherparse::IpNumber::IPV4 {
                 let payload: Result<CustomTcpPayload> = remaining_packet.try_into();
                 
                 // Then check if it is a valid payload (could be chatter on the line or localhost
@@ -130,7 +130,7 @@ fn create_socket() -> Result<OwnedFd> {
     socket(
         AddressFamily::INET,
         SocketType::RAW,
-        Some(rustix::net::ipproto::RAW),
+        Some(rustix::net::ipproto::IPIP),
     )
     .with_context(|| "Failed to create socket")
 }

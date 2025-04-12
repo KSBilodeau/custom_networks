@@ -5,8 +5,8 @@ use anyhow::{Context, Result};
 fn main() -> Result<()> {
     let src_ip_addr =
         std::env::var("SRC_IP_ADDR").with_context(|| "Missing SRC IP addr environment variable")?;
-    let dst_ip_addr =
-        std::env::var("DST_IP_ADDR").with_context(|| "Missing DEST IP addr environment variable")?;
+    let dst_ip_addr = std::env::var("DST_IP_ADDR")
+        .with_context(|| "Missing DEST IP addr environment variable")?;
     let src_port =
         std::env::var("SRC_PORT").with_context(|| "Missing port environment variable")?;
     let dst_port =

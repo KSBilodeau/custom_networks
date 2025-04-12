@@ -11,7 +11,13 @@ pub fn accept<'a>(
     src_port: &str,
 ) -> anyhow::Result<Connection<'a>> {
     unsafe {
-        libc::setsockopt(socket.as_raw_fd(), libc::IPPROTO_RAW, libc::IP_HDRINCL, &0 as *const _ as *const _, 4);
+        libc::setsockopt(
+            socket.as_raw_fd(),
+            libc::IPPROTO_RAW,
+            libc::IP_HDRINCL,
+            &0 as *const _ as *const _,
+            4,
+        );
     }
     // Look for incoming IP address broadcasts from potential clients
     let mut broadcast_buf = [0u8; 65535];
@@ -34,7 +40,7 @@ pub fn accept<'a>(
             .with_context(|| "Failed to extract client addr from port")?;
 
         if src_port == port {
-            let client_addr: SocketAddr = format!("{}:{}", client_addr, client_port)
+            let client_addr: SocketAddr = format!("{}:0", client_addr)
                 .parse()
                 .with_context(|| "Failed to convert ip address from string")?;
 

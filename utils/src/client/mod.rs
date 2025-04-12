@@ -13,8 +13,15 @@ pub fn connect<'a>(
     dst_port: &str,
 ) -> anyhow::Result<Connection<'a>> {
     unsafe {
-        libc::setsockopt(socket.as_raw_fd(), libc::IPPROTO_RAW, libc::IP_HDRINCL, &0 as *const _ as *const _, 4);
+        libc::setsockopt(
+            socket.as_raw_fd(),
+            libc::IPPROTO_RAW,
+            libc::IP_HDRINCL,
+            &0 as *const _ as *const _,
+            4,
+        );
     }
+
     // Create server socket address
     let server_addr: SocketAddr = format!("{}:{}", dst_ip_addr, dst_port)
         .parse()
@@ -37,7 +44,7 @@ pub fn connect<'a>(
         let (ip_header, buf) = etherparse::Ipv4Header::from_slice(&buf[0..bytes_read])
             .with_context(|| "Failed to construct header from buffer")?;
 
-        if ip_header.protocol == etherparse::IpNumber::from(255)
+        if ip_header.protocol == etherparse::IpNumber::IPV4
             && buf == format!("{}::{}:{}", &src_port, &dst_ip_addr, &dst_port).as_bytes()
         {
             break;
