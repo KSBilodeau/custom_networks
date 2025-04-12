@@ -3,13 +3,16 @@ use anyhow::Context;
 use rustix::io::read;
 use rustix::net::sendto;
 use std::net::SocketAddr;
-use std::os::fd::OwnedFd;
+use std::os::fd::{AsRawFd, OwnedFd};
 
 pub fn accept<'a>(
     socket: &'a OwnedFd,
     src_ip_addr: &str,
     src_port: &str,
 ) -> anyhow::Result<Connection<'a>> {
+    unsafe {
+        libc::setsockopt(socket.as_raw_fd(), libc::IPPROTO_RAW, libc::IP_HDRINCL, &0 as *const _ as *const _, 4);
+    }
     // Look for incoming IP address broadcasts from potential clients
     let mut broadcast_buf = [0u8; 65535];
     loop {
