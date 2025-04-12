@@ -115,9 +115,9 @@ impl Connection<'_> {
     }
 }
 
-pub fn bind_raw(ip_addr: &str) -> Result<OwnedFd> {
+pub fn bind_raw(ip_addr: &str, port: &str) -> Result<OwnedFd> {
     let socket_file_desc = create_socket()?;
-    let sock_addr: SocketAddr = format!("{}:0000", ip_addr)
+    let sock_addr: SocketAddr = format!("{}:{}", ip_addr, port)
         .parse()
         .with_context(|| "Failed to convert ip address from string")?;
 

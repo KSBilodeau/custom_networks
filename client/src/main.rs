@@ -12,7 +12,7 @@ fn main() -> Result<()> {
     let dst_port =
         std::env::var("DST_PORT").with_context(|| "Missing port environment variable")?;
 
-    let socket_file_desc = utils::bind_raw(&src_ip_addr)?;
+    let socket_file_desc = utils::bind_raw(&src_ip_addr, &src_port)?;
 
     let conn = utils::client::connect(
         &socket_file_desc,
