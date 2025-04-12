@@ -14,6 +14,7 @@ pub fn accept<'a>(socket: &'a OwnedFd, src_port: &str) -> anyhow::Result<Connect
             4,
         );
     }
+    
     // Look for incoming IP address broadcasts from potential clients
     let mut broadcast_buf = [0u8; 65535];
     loop {
