@@ -11,8 +11,12 @@ fn main() -> Result<()> {
     let socket = utils::bind_raw(&src_ip_addr)?;
 
     loop {
-        let _conn = utils::server::accept(&socket, &src_ip_addr, &src_port)?;
+        let conn = utils::server::accept(&socket, &src_ip_addr, &src_port)?;
 
         println!("Accept completed successfully!");
+
+        conn.handshake()?;
+        
+        println!("Handshake completed successfully!");
     }
 }

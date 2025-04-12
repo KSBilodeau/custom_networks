@@ -1,4 +1,4 @@
-use crate::Connection;
+use crate::{Connection, ConnectionType};
 use anyhow::Context;
 use rustix::io::read;
 use rustix::net::sendto;
@@ -43,6 +43,7 @@ pub fn accept<'a>(
             )?;
 
             return Ok(Connection {
+                conn_type: ConnectionType::Server,
                 src_socket: socket,
                 src_port: src_port
                     .parse()

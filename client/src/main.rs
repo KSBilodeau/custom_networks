@@ -14,7 +14,7 @@ fn main() -> Result<()> {
 
     let socket_file_desc = utils::bind_raw(&dst_ip_addr)?;
 
-    let _conn = utils::client::connect(
+    let conn = utils::client::connect(
         &socket_file_desc,
         &src_ip_addr,
         &src_port,
@@ -23,6 +23,10 @@ fn main() -> Result<()> {
     )?;
 
     println!("Connect completed successfully!");
+
+    conn.handshake()?;
+
+    println!("Handshake completed successfully!");
 
     Ok(())
 }

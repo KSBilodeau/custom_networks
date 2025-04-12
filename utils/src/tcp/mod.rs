@@ -118,11 +118,15 @@ impl CustomTcpPayload {
     pub(crate) fn new(
         src_port: u16,
         dst_port: u16,
+        msg: &[u8],
         flags: Vec<CustomTcpFlags>,
     ) -> CustomTcpPayload {
+        let mut data = [0u8; Self::MAX_SEGMENT_SIZE];
+        data[0..msg.len()].copy_from_slice(&msg);
+
         CustomTcpPayload {
             header: CustomTcpHeader::new(src_port, dst_port, flags),
-            data: [0u8; Self::MAX_SEGMENT_SIZE],
+            data,
         }
     }
 
