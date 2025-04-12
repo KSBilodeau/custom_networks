@@ -95,19 +95,18 @@ impl Connection<'_> {
             let bytes_read = read(&self.src_socket, &mut packet_buf)
                 .with_context(|| "Failed to read payload from buffer")?;
             let syn_packet = &packet_buf[0..bytes_read];
+            
+            if let Ok((ip_header, remaining_packet)) = etherparse::Ipv4Header::from_slice(&syn_packet) {
+                // Check if it came from a raw socket first
+                if ip_header.protocol == etherparse::IpNumber::IPV4 {
+                    let payload: Result<CustomTcpPayload> = remaining_packet.try_into();
 
-            let (ip_header, remaining_packet) = etherparse::Ipv4Header::from_slice(&syn_packet)
-                .with_context(|| "Failed to extract IpV4 header")?;
-
-            // Check if it came from a raw socket first
-            if ip_header.protocol == etherparse::IpNumber::IPV4 {
-                let payload: Result<CustomTcpPayload> = remaining_packet.try_into();
-                
-                // Then check if it is a valid payload (could be chatter on the line or localhost
-                // loopback interference)
-                if let Ok(payload) = payload {
-                    if payload.src_port() == self.dst_port && payload.dst_port() == self.src_port {
-                        return Ok(payload);
+                    // Then check if it is a valid payload (could be chatter on the line or localhost
+                    // loopback interference)
+                    if let Ok(payload) = payload {
+                        if payload.src_port() == self.dst_port && payload.dst_port() == self.src_port {
+                            return Ok(payload);
+                        }
                     }
                 }
             }

@@ -39,14 +39,13 @@ pub fn connect<'a>(
     loop {
         let bytes_read =
             read(socket, &mut buf).with_context(|| "Failed to read bytes from socket")?;
-
-        let (ip_header, buf) = etherparse::Ipv4Header::from_slice(&buf[0..bytes_read])
-            .with_context(|| "Failed to construct header from buffer")?;
-
-        if ip_header.protocol == etherparse::IpNumber::IPV4
-            && buf == format!("{}::{}", &src_port, &dst_port).as_bytes()
-        {
-            break;
+        
+        if let Ok((ip_header, buf)) = etherparse::Ipv4Header::from_slice(&buf[0..bytes_read]) {
+            if ip_header.protocol == etherparse::IpNumber::IPV4
+                && buf == format!("{}::{}", &src_port, &dst_port).as_bytes()
+            {
+                break;
+            }
         }
     }
 
