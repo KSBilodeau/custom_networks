@@ -8,7 +8,7 @@ use crate::tcp::{CustomTcpFlags, CustomTcpPayload};
 use anyhow::{bail, Context, Result};
 use rustix::fd::OwnedFd;
 use rustix::io::read;
-use rustix::net::{bind, sendto, socket, AddressFamily, SocketType};
+use rustix::net::{sendto, socket, AddressFamily, SocketType};
 use std::net::SocketAddr;
 
 #[derive(Debug)]
@@ -114,22 +114,11 @@ impl Connection<'_> {
     }
 }
 
-pub fn bind_raw(ip_addr: &str, port: &str) -> Result<OwnedFd> {
-    let socket_file_desc = create_socket()?;
-    let sock_addr: SocketAddr = format!("{}:{}", ip_addr, port)
-        .parse()
-        .with_context(|| "Failed to convert ip address from string")?;
-
-    bind(&socket_file_desc, &sock_addr)?;
-
-    Ok(socket_file_desc)
-}
-
-fn create_socket() -> Result<OwnedFd> {
+pub fn create_socket() -> Result<OwnedFd> {
     socket(
         AddressFamily::INET,
         SocketType::RAW,
         Some(rustix::net::ipproto::IPIP),
     )
-    .with_context(|| "Failed to create socket")
+        .with_context(|| "Failed to create socket")
 }
