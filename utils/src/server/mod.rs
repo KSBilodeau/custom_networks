@@ -1,57 +1,83 @@
 use crate::{Connection, ConnectionType};
-use anyhow::Context;
-use rustix::net::{recvfrom, sendto, RecvFlags};
-use std::net::SocketAddr;
-use std::os::fd::{AsRawFd, OwnedFd};
+use anyhow::{Context, Result};
+use etherparse::IpNumber;
+use rustix::net::{recvfrom, sendto, AddressFamily, RecvFlags, SendFlags, SocketType};
+use std::net::SocketAddrV4;
+use std::os::fd::OwnedFd;
 
-pub fn accept<'a>(socket: &'a OwnedFd, src_port: &str) -> anyhow::Result<Connection<'a>> {
-    unsafe {
-        libc::setsockopt(
-            socket.as_raw_fd(),
-            libc::IPPROTO_RAW,
-            libc::IP_HDRINCL,
-            &0 as *const _ as *const _,
-            4,
-        );
+#[derive(Debug)]
+pub struct CustomSocket {
+    src_addr: SocketAddrV4,
+    socket: OwnedFd,
+}
+
+impl CustomSocket {
+    pub fn new(src_addr: SocketAddrV4) -> Result<CustomSocket> {
+        let socket = rustix::net::socket(
+            AddressFamily::INET,
+            SocketType::RAW,
+            Some(rustix::net::Protocol::from_raw(
+                rustix::net::RawProtocol::new(253)
+                    .with_context(|| "Failed to create custom protocol number")?,
+            )),
+        )
+        .with_context(|| "Failed to create raw socket")?;
+
+        Ok(CustomSocket { src_addr, socket })
     }
-    
-    // Look for incoming IP address broadcasts from potential clients
-    let mut broadcast_buf = [0u8; 65535];
-    loop {
-        let (bytes_read, _, sock_addr) =
-            recvfrom(socket, &mut broadcast_buf, RecvFlags::empty())
-                .with_context(|| "Failed to read broadcast bytes to buffer")?;
-        let broadcast = &broadcast_buf[0..bytes_read];
 
-        if let Ok((_, broadcast)) = etherparse::Ipv4Header::from_slice(broadcast) {
-            let broadcast_str = String::from_utf8_lossy(&broadcast);
+    pub(crate) fn send(&self, msg: &[u8], dst_addr: SocketAddrV4) -> Result<()> {
+        sendto(&self.socket, msg, SendFlags::empty(), &dst_addr)?;
 
-            let (port, client_port) = broadcast_str
-                .split_once("::")
-                .with_context(|| "Failed to extract ip addr from port")?;
+        Ok(())
+    }
 
-            if src_port == port {
-                if let Some(client_addr) = sock_addr {
-                    sendto(
-                        &socket,
-                        format!("{}::{}", &client_port, &src_port).as_bytes(),
-                        rustix::net::SendFlags::empty(),
-                        &client_addr,
-                    )?;
+    pub(crate) fn recv(&self, ip_check: bool) -> Result<Vec<u8>> {
+        let mut buf = [0u8; 65535];
 
-                    return Ok(Connection {
-                        conn_type: ConnectionType::Server,
-                        src_socket: socket,
-                        src_port: src_port
-                            .parse()
-                            .with_context(|| "Failed to convert port to u16")?,
-                        dst_socket: SocketAddr::try_from(client_addr)?,
-                        dst_port: client_port
-                            .parse()
-                            .with_context(|| "Failed to convert port to u16")?,
-                    });
+        loop {
+            let (bytes_read, _, _) = recvfrom(&self.socket, &mut buf, RecvFlags::empty())?;
+            let remaining_packet = &buf[0..bytes_read];
+
+            let Ok((ip_header, remaining_packet)) =
+                etherparse::Ipv4Header::from_slice(remaining_packet)
+            else {
+                continue;
+            };
+
+            if String::from_utf8_lossy(&remaining_packet[0..self.src_addr.to_string().len()])
+                == self.src_addr.to_string()
+                || !ip_check
+            {
+                if ip_header.protocol == IpNumber::from(255) {
+                    return Ok(remaining_packet.to_vec());
                 }
             }
         }
     }
+}
+
+pub fn accept(socket: &CustomSocket) -> Result<Connection> {
+    let broadcast_bytes = socket.recv(true)?;
+    let broadcast = String::from_utf8_lossy(&*broadcast_bytes);
+
+    let (_, client_addr) = broadcast
+        .split_once("::")
+        .with_context(|| "Failed to extract client IP address from broadcast")?;
+
+    let client_socket: SocketAddrV4 = client_addr
+        .parse()
+        .with_context(|| "Failed to parse client IP address")?;
+
+    socket.send(
+        format!("{}::{}", client_socket, socket.src_addr).as_bytes(),
+        client_socket,
+    )?;
+
+    Ok(Connection {
+        conn_type: ConnectionType::Server,
+        src_addr: socket.src_addr,
+        dst_addr: client_socket,
+        socket: &socket.socket,
+    })
 }

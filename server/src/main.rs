@@ -1,17 +1,15 @@
 #![deny(clippy::pedantic)]
 
-use anyhow::{Context, Result};
+use anyhow::Result;
+use std::net::SocketAddrV4;
 
 fn main() -> Result<()> {
-    let _src_ip_addr =
-        std::env::var("SRC_IP_ADDR").with_context(|| "Missing IP addr environment variable")?;
-    let src_port =
-        std::env::var("SRC_PORT").with_context(|| "Missing port environment variable")?;
+    let server_ip: SocketAddrV4 = std::env::var("SERVER_IP_ADDR")?.parse()?;
 
-    let socket = utils::create_socket()?;
+    let socket = utils::server::CustomSocket::new(server_ip)?;
 
     loop {
-        let conn = utils::server::accept(&socket, &src_port)?;
+        let conn = utils::server::accept(&socket)?;
 
         println!("Accept completed successfully!");
 

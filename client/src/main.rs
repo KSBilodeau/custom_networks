@@ -1,20 +1,15 @@
 #![deny(clippy::pedantic)]
 
-use anyhow::{Context, Result};
+use anyhow::Result;
+use std::net::SocketAddrV4;
 
 fn main() -> Result<()> {
-    let _src_ip_addr =
-        std::env::var("SRC_IP_ADDR").with_context(|| "Missing SRC IP addr environment variable")?;
-    let dst_ip_addr = std::env::var("DST_IP_ADDR")
-        .with_context(|| "Missing DEST IP addr environment variable")?;
-    let src_port =
-        std::env::var("SRC_PORT").with_context(|| "Missing port environment variable")?;
-    let dst_port =
-        std::env::var("DST_PORT").with_context(|| "Missing port environment variable")?;
+    let server_ip: SocketAddrV4 = std::env::var("SERVER_IP_ADDR")?.parse()?;
+    let client_ip: SocketAddrV4 = std::env::var("CLIENT_IP_ADDR")?.parse()?;
 
-    let socket_file_desc = utils::create_socket()?;
+    let socket = utils::client::CustomSocket::new(client_ip, server_ip)?;
 
-    let conn = utils::client::connect(&socket_file_desc, &src_port, &dst_ip_addr, &dst_port)?;
+    let conn = utils::client::connect(&socket)?;
 
     println!("Connect completed successfully!");
 

@@ -1,63 +1,78 @@
 use crate::{Connection, ConnectionType};
-use anyhow::Context;
-use rustix::io::read;
-use rustix::net::sendto;
-use std::net::SocketAddr;
-use std::os::fd::{AsRawFd, OwnedFd};
+use anyhow::{bail, Context};
+use rustix::net::{recvfrom, sendto, AddressFamily, RecvFlags, SendFlags, SocketType};
+use std::net::SocketAddrV4;
+use std::os::fd::OwnedFd;
 
-pub fn connect<'a>(
-    socket: &'a OwnedFd,
-    src_port: &str,
-    dst_ip_addr: &str,
-    dst_port: &str,
-) -> anyhow::Result<Connection<'a>> {
-    unsafe {
-        libc::setsockopt(
-            socket.as_raw_fd(),
-            libc::IPPROTO_RAW,
-            libc::IP_HDRINCL,
-            &0 as *const _ as *const _,
-            4,
-        );
+pub struct CustomSocket {
+    src_addr: SocketAddrV4,
+    dst_addr: SocketAddrV4,
+    socket: OwnedFd,
+}
+
+impl CustomSocket {
+    pub fn new(src_addr: SocketAddrV4, dst_addr: SocketAddrV4) -> anyhow::Result<CustomSocket> {
+        let socket = rustix::net::socket(
+            AddressFamily::INET,
+            SocketType::RAW,
+            Some(rustix::net::Protocol::from_raw(
+                rustix::net::RawProtocol::new(253)
+                    .with_context(|| "Failed to create custom protocol number")?,
+            )),
+        )
+        .with_context(|| "Failed to create raw socket")?;
+
+        Ok(CustomSocket {
+            src_addr,
+            dst_addr,
+            socket,
+        })
     }
 
-    // Create server socket address
-    let server_addr: SocketAddr = format!("{}:{}", dst_ip_addr, dst_port)
-        .parse()
-        .with_context(|| "Failed to convert ip address from string")?;
+    fn send(&self, msg: &[u8]) -> anyhow::Result<()> {
+        sendto(&self.socket, msg, SendFlags::empty(), &self.dst_addr)?;
 
-    // Initiate connection with the server by broadcasting address to it
-    sendto(
-        &socket,
-        &format!("{}::{}", dst_port, src_port).into_bytes(),
-        rustix::net::SendFlags::empty(),
-        &server_addr,
-    )?;
+        Ok(())
+    }
 
-    // Wait for server accept message
-    let mut buf = [0u8; 65535];
-    loop {
-        let bytes_read =
-            read(socket, &mut buf).with_context(|| "Failed to read bytes from socket")?;
-        
-        if let Ok((ip_header, buf)) = etherparse::Ipv4Header::from_slice(&buf[0..bytes_read]) {
-            if ip_header.protocol == etherparse::IpNumber::IPV4
-                && buf == format!("{}::{}", &src_port, &dst_port).as_bytes()
+    fn recv(&self) -> anyhow::Result<Vec<u8>> {
+        let mut buf = [0u8; 65535];
+
+        loop {
+            let (bytes_read, _, _) = recvfrom(&self.socket, &mut buf, RecvFlags::empty())?;
+            let remaining_packet = &buf[0..bytes_read];
+
+            let Ok((_, remaining_packet)) = etherparse::Ipv4Header::from_slice(remaining_packet)
+            else {
+                continue;
+            };
+
+            if String::from_utf8_lossy(&remaining_packet[0..self.src_addr.to_string().len()])
+                == self.src_addr.to_string()
             {
-                break;
+                return Ok(remaining_packet.to_vec());
             }
         }
+    }
+}
+
+pub fn connect(socket: &CustomSocket) -> anyhow::Result<Connection> {
+    let broadcast_string = format!("{}::{}", socket.dst_addr, socket.src_addr);
+
+    socket.send(&broadcast_string.as_bytes())?;
+
+    let broadcast_echo = socket.recv()?;
+
+    if String::from_utf8_lossy(&broadcast_echo)
+        != format!("{}::{}", socket.src_addr, socket.dst_addr)
+    {
+        bail!("Incorrect broadcast echo message")
     }
 
     Ok(Connection {
         conn_type: ConnectionType::Client,
-        src_socket: &socket,
-        src_port: src_port
-            .parse()
-            .with_context(|| "Failed to convert port to u16")?,
-        dst_socket: server_addr,
-        dst_port: dst_port
-            .parse()
-            .with_context(|| "Failed to convert port to u16")?,
+        src_addr: socket.src_addr,
+        dst_addr: socket.dst_addr,
+        socket: &socket.socket,
     })
 }
